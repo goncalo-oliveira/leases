@@ -15,6 +15,7 @@
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageIcon>faactory.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/goncalo-oliveira/leases</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
