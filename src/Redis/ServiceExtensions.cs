@@ -30,4 +30,25 @@ public static class RedisDistributedLeasesServiceExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Adds the necessary services for using Redis distributed timers.
+    /// </summary>
+    /// <param name="services">The service collection to add the services to.</param>
+    /// <param name="configure">An optional action to configure the RedisTimerStoreOptions.</param>
+    /// <returns>The updated service collection.</returns>
+    public static IServiceCollection AddRedisDistributedTimers( this IServiceCollection services, Action<RedisTimerStoreOptions>? configure = null )
+    {
+        if ( configure != null )
+        {
+            services.AddOptions<RedisTimerStoreOptions>()
+                .Validate( options => !string.IsNullOrEmpty( options.KeyPrefix ), "KeyPrefix must be provided." )
+                .ValidateOnStart()
+                .Configure( configure );
+        }
+
+        services.AddSingleton<IDistributedTimerStore, RedisTimerStore>();
+
+        return services;
+    }
 }

@@ -51,7 +51,7 @@ public abstract class LeasedService( IDistributedLeaseStore leaseStore ) : Backg
 
         if ( !acquired )
         {
-            await DelayWithJitterAsync( RetryInterval, cancellationToken );
+            await JitterDelay.DelayAsync( RetryInterval, cancellationToken );
 
             return null;
         }
@@ -61,12 +61,5 @@ public abstract class LeasedService( IDistributedLeaseStore leaseStore ) : Backg
             release: ct => leaseStore.ReleaseAsync( LeaseName, OwnerId, ct ),
             renewInterval: RenewalInterval
         );
-    }
-
-    private static Task DelayWithJitterAsync( TimeSpan interval, CancellationToken cancellationToken )
-    {
-        var jitter = TimeSpan.FromMilliseconds( Random.Shared.Next( 0, 500 ) );
-
-        return Task.Delay( interval + jitter, cancellationToken );
     }
 }

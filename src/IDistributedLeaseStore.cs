@@ -13,7 +13,7 @@ public interface IDistributedLeaseStore
     /// <param name="ttl">The time-to-live for the lease.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>True if the lease was successfully acquired; otherwise, false.</returns>
-    Task<bool> TryAcquireAsync( string key, string owner, TimeSpan ttl, CancellationToken cancellationToken );
+    Task<bool> TryAcquireAsync( string key, string owner, TimeSpan ttl, CancellationToken cancellationToken = default );
 
     /// <summary>
     /// Renews an existing lease for a given key and owner with a new time-to-live (TTL).
@@ -23,7 +23,7 @@ public interface IDistributedLeaseStore
     /// <param name="ttl">The new time-to-live for the lease.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>True if the lease was successfully renewed; otherwise, false.</returns>
-    Task<bool> RenewAsync( string key, string owner, TimeSpan ttl, CancellationToken cancellationToken );
+    Task<bool> RenewAsync( string key, string owner, TimeSpan ttl, CancellationToken cancellationToken = default );
 
     /// <summary>
     /// Releases an existing lease for a given key and owner.
@@ -32,5 +32,5 @@ public interface IDistributedLeaseStore
     /// <param name="owner">The owner attempting to release the lease.</param>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>True if the lease was successfully released; otherwise, false.</returns>
-    Task<bool> ReleaseAsync( string key, string owner, CancellationToken cancellationToken );
+    Task<bool> ReleaseAsync( string key, string owner, CancellationToken cancellationToken = default );
 }
