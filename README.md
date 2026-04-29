@@ -1,40 +1,70 @@
-# Distributed Leases
+# Distributed Coordination
 
-A minimal abstraction for coordinating work across multiple instances using **distributed leases**.
+Minimal abstractions for coordinating work across multiple instances.
 
-Supports scenarios like:
-- leader election
-- singleton background tasks
-- coordination across nodes
+Provides two independent primitives:
+
+- **Distributed leases**: coordinate *who* runs
+- **Distributed timers**: coordinate *when* work runs
+
+They can be used separately or combined.
 
 ---
 
 ## Concepts
 
-- **Lease**: temporary ownership of a resource (with TTL)
-- **Owner**: the instance holding the lease
-- **Renewal**: keeps the lease alive
-- **Expiration**: lease is lost if not renewed
+### Lease
+
+A lease represents temporary ownership of a resource.
+
+Used for:
+
+- leader election
+- singleton work
+- mutual exclusion across instances
+
+---
+
+### Timer
+
+A timer represents a shared periodic schedule.
+
+Used for:
+
+- periodic background tasks
+- coordinated execution across nodes
+- restart-safe scheduling without cron
+
+---
+
+## Registration
+
+> [!IMPORTANT]
+> Redis implementations require `IConnectionMultiplexer` to be registered.
+
+### Redis leases
+
+```csharp
+services.AddRedisDistributedLeases( options =>
+{
+    options.KeyPrefix = "leases";
+} );
+```
+
+### Redis timers
+
+```csharp
+services.AddRedisDistributedTimers( options =>
+{
+    options.KeyPrefix = "timers";
+} );
+```
 
 ---
 
 ## Usage
 
-### 1. Register services
-
-```csharp
-services.AddRedisDistributedLeases( options =>
-{
-    options.KeyPrefix = "service-leases"; // optional: this is the default prefix
-} );
-```
-
-> [!IMPORTANT]
-> Requires `IConnectionMultiplexer` to be registered.
-
----
-
-### 2. Create a service
+### Lease example
 
 ```csharp
 public sealed class MyService( IDistributedLeaseStore leaseStore )
@@ -46,7 +76,7 @@ public sealed class MyService( IDistributedLeaseStore leaseStore )
     {
         while ( !stoppingToken.IsCancellationRequested )
         {
-            // always-run work
+            // do optional non-leader work here
 
             await using var lease = await TryAcquireLeaseAsync( stoppingToken );
 
@@ -63,26 +93,82 @@ public sealed class MyService( IDistributedLeaseStore leaseStore )
 
 ---
 
+### Timer example
+
+```csharp
+public sealed class MyService( IDistributedTimerStore timerStore )
+{
+    public async Task ExecuteAsync( CancellationToken cancellationToken )
+    {
+        var timer = new DistributedTimer(
+            timerStore,
+            "my-timer",
+            TimeSpan.FromMinutes( 10 )
+        );
+
+        while ( await timer.WaitForNextTickAsync( cancellationToken ) )
+        {
+            // periodic work
+        }
+    }
+}
+```
+
+---
+
+### Combined example
+
+```csharp
+public sealed class MyService(
+    IDistributedLeaseStore leaseStore,
+    IDistributedTimerStore timerStore
+)
+    : LeasedService( leaseStore )
+{
+    protected override string LeaseName => "my-service";
+
+    protected override async Task ExecuteAsync( CancellationToken stoppingToken )
+    {
+        var timer = new DistributedTimer(
+            timerStore,
+            "my-timer",
+            TimeSpan.FromMinutes( 10 )
+        );
+
+        while ( await timer.WaitForNextTickAsync( stoppingToken ) )
+        {
+            await using var lease = await TryAcquireLeaseAsync( stoppingToken );
+
+            if ( lease is null )
+            {
+                continue;
+            }
+
+            // leader-only periodic work
+        }
+    }
+}
+```
+
+---
+
 ## Redis Implementation
 
-Uses:
+### Leases
+
 - `SET NX PX` for acquisition
-- Lua scripts for safe renew/release (owner-checked)
+- Lua scripts for safe renew/release
+- owner-checked operations
 
-Keys are prefixed using `RedisLeaseStoreOptions.KeyPrefix`.
+### Timers
 
----
+- Redis TTL defines the timer window
+- Lua script creates the timer if missing
+- key expiration drives the next tick
 
-## Notes
+Behavior:
 
-- Lease loss is silent by default — design your leader work accordingly
-- Renewal happens automatically while the lease is held
-- The store abstraction allows future alternative backends (e.g. Postgres, etcd)
-
----
-
-## Summary
-
-- Simple API
-- No storage coupling in services
-- Safe distributed coordination via leases
+- first run executes immediately
+- subsequent runs occur every period
+- timer state survives restarts while Redis persists the key
+- all instances align on the same schedule
