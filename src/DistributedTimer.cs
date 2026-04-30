@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace Faactory.Leases;
 
 /// <summary>
@@ -6,8 +8,11 @@ namespace Faactory.Leases;
 /// <param name="timerStore">The distributed timer store.</param>
 /// <param name="name">The name of the timer.</param>
 /// <param name="period">The period of the timer.</param>
-public sealed class DistributedTimer( IDistributedTimerStore timerStore, string name, TimeSpan period )
+/// <param name="loggerFactory">The logger factory to use for logging (optional).</param>
+public sealed class DistributedTimer( IDistributedTimerStore timerStore, string name, TimeSpan period, ILoggerFactory? loggerFactory = null )
 {
+    private readonly ILogger? logger = loggerFactory?.CreateLogger<DistributedTimer>();
+
     /// <summary>
     /// Waits for the next tick of the timer.
     /// This method will block until the timer ticks or the cancellation token is cancelled.
@@ -32,8 +37,20 @@ public sealed class DistributedTimer( IDistributedTimerStore timerStore, string 
             {
                 return false;
             }
-            catch
+            catch ( Exception ex )
             {
+                // log the exception (default logger)
+                if ( logger != null )
+                {
+                    logger.LogError( ex, "Failed to wait for next tick of distributed timer (name: '{TimerName}').", name );
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        $"DistributedTimer( '{name}' ) ) [Error]: Failed to wait for next tick of distributed timer.{Environment.NewLine}    {ex}"
+                    );
+                }
+
                 // Ignore and retry
                 await JitterDelay.DelayAsync( TimeSpan.FromMilliseconds( 500 ), cancellationToken );
             }
