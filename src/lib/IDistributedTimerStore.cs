@@ -6,13 +6,13 @@ namespace Faactory.Leases;
 public interface IDistributedTimerStore
 {
     /// <summary>
-    /// Gets or creates a timer for the specified key and period.
-    /// If a timer already exists for the key, it returns the remaining time until the timer expires.
+    /// Gets or creates a timer for the specified name and period.
+    /// If a timer already exists for the name, it returns the remaining time until the timer expires.
     /// If no timer exists, it creates a new timer with the specified period and returns the full period.
     /// </summary>
-    /// <param name="key">The unique key identifying the timer.</param>
+    /// <param name="name">The unique name identifying the timer.</param>
     /// <param name="period">The period for the timer.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The remaining time until the timer expires, or the full period if a new timer was created.</returns>
-    Task<TimeSpan> GetOrCreateTimerAsync( string key, TimeSpan period, CancellationToken cancellationToken = default );
+    Task<TimeSpan> GetOrCreateTimerAsync( string name, TimeSpan period, CancellationToken cancellationToken = default );
 }

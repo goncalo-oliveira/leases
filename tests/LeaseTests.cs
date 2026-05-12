@@ -1,10 +1,18 @@
 ﻿using Faactory.Leases;
 using NSubstitute;
+using NSubstitute.ReturnsExtensions;
 
 namespace tests;
 
 public class LeaseTests
 {
+    private sealed class TestLeaseHandle( string ownerId ) : IDistributedLeaseHandle
+    {
+        public string Name => "test";
+        public string OwnerId { get; } = ownerId;
+        public TimeSpan Ttl => TimeSpan.FromSeconds( 30 );
+    }
+
     internal sealed class TestService( IDistributedLeaseStore store )
         : LeasedService(store)
     {
@@ -32,7 +40,7 @@ public class LeaseTests
             Arg.Any<TimeSpan>(),
             Arg.Any<CancellationToken>()
         )
-        .Returns( true );
+        .Returns( new TestLeaseHandle( "owner" ) );
 
         var service = new TestService( store );
 
@@ -52,7 +60,7 @@ public class LeaseTests
             Arg.Any<TimeSpan>(),
             Arg.Any<CancellationToken>()
         )
-        .Returns( false );
+        .ReturnsNull();
 
         var service = new TestService( store );
 
@@ -72,12 +80,10 @@ public class LeaseTests
             Arg.Any<TimeSpan>(),
             Arg.Any<CancellationToken>()
         )
-        .Returns( true );
+        .Returns( new TestLeaseHandle( "owner" ) );
 
         store.RenewAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<TimeSpan>(),
+            Arg.Any<IDistributedLeaseHandle>(),
             Arg.Any<CancellationToken>()
         )
         .Returns( true, false );
@@ -93,8 +99,7 @@ public class LeaseTests
         await lease.DisposeAsync();
 
         await store.Received().ReleaseAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
+            Arg.Any<IDistributedLeaseHandle>(),
             Arg.Any<CancellationToken>()
         );
     }
@@ -110,12 +115,10 @@ public class LeaseTests
             Arg.Any<TimeSpan>(),
             Arg.Any<CancellationToken>()
         )
-        .Returns( true );
+        .Returns( new TestLeaseHandle( "owner" ) );
 
         store.RenewAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
-            Arg.Any<TimeSpan>(),
+            Arg.Any<IDistributedLeaseHandle>(),
             Arg.Any<CancellationToken>()
         )
         .Returns( true );
@@ -129,8 +132,7 @@ public class LeaseTests
         await lease.DisposeAsync();
 
         await store.Received( 1 ).ReleaseAsync(
-            Arg.Any<string>(),
-            Arg.Any<string>(),
+            Arg.Any<IDistributedLeaseHandle>(),
             Arg.Any<CancellationToken>()
         );
     }

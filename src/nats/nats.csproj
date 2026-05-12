@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <Version>0.3.0-preview1</Version>
+    <AssemblyName>faactory.leases.nats</AssemblyName>
+    <RootNamespace>Faactory.Leases.NATS</RootNamespace>
+    <PackageId>Faactory.Leases.NATS</PackageId>
+    <Authors>Goncalo Oliveira</Authors>
+    <Description>Lightweight distributed coordination primitives using NATS</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageIcon>faactory.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/goncalo-oliveira/leases</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../faactory.png" Pack="true" PackagePath="/" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\lib\lib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NATS.Net" Version="2.7.3" />
+  </ItemGroup>
+
+</Project>

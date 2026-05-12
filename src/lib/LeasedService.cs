@@ -17,8 +17,9 @@ public abstract class LeasedService( IDistributedLeaseStore leaseStore ) : Backg
 
     /// <summary>
     /// The name of the lease, which is used to identify the lease in the lease store.
+    /// By default, it uses the full name of the service class, but you can override this property to provide a custom lease name if needed.
     /// </summary>
-    protected abstract string LeaseName { get; }
+    protected virtual string LeaseName => GetType().FullName ?? GetType().Name;
 
     /// <summary>
     /// The time-to-live (TTL) for the lease, which determines how long the lease is valid before it expires.
@@ -42,24 +43,20 @@ public abstract class LeasedService( IDistributedLeaseStore leaseStore ) : Backg
     /// <returns>A DistributedLease object if the lease is successfully acquired; otherwise, null.</returns>
     protected async Task<DistributedLease?> TryAcquireLeaseAsync( CancellationToken cancellationToken )
     {
-        var acquired = await leaseStore.TryAcquireAsync(
+        var handle = await leaseStore.TryAcquireAsync(
             LeaseName,
             OwnerId,
             LeaseTtl,
             cancellationToken
         );
 
-        if ( !acquired )
+        if ( handle is null )
         {
             await JitterDelay.DelayAsync( RetryInterval, cancellationToken );
 
             return null;
         }
 
-        return new DistributedLease(
-            renew: ct => leaseStore.RenewAsync( LeaseName, OwnerId, LeaseTtl, ct ),
-            release: ct => leaseStore.ReleaseAsync( LeaseName, OwnerId, ct ),
-            renewInterval: RenewalInterval
-        );
+        return new DistributedLease( leaseStore, handle, RenewalInterval );
     }
 }

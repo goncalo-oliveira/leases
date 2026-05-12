@@ -18,12 +18,13 @@ public static class RedisDistributedLeasesServiceExtensions
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddRedisDistributedLeases( this IServiceCollection services, Action<RedisLeaseStoreOptions>? configure = null )
     {
+        var optionsBuilder = services.AddOptions<RedisLeaseStoreOptions>()
+            .Validate( options => !string.IsNullOrEmpty( options.KeyPrefix ), "KeyPrefix must be provided." )
+            .ValidateOnStart();
+
         if ( configure != null )
         {
-            services.AddOptions<RedisLeaseStoreOptions>()
-                .Validate( options => !string.IsNullOrEmpty( options.KeyPrefix ), "KeyPrefix must be provided." )
-                .ValidateOnStart()
-                .Configure( configure );
+            optionsBuilder.Configure( configure );
         }
 
         services.AddSingleton<IDistributedLeaseStore, RedisLeaseStore>();
@@ -39,12 +40,13 @@ public static class RedisDistributedLeasesServiceExtensions
     /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddRedisDistributedTimers( this IServiceCollection services, Action<RedisTimerStoreOptions>? configure = null )
     {
+        var optionsBuilder = services.AddOptions<RedisTimerStoreOptions>()
+            .Validate( options => !string.IsNullOrEmpty( options.KeyPrefix ), "KeyPrefix must be provided." )
+            .ValidateOnStart();
+
         if ( configure != null )
         {
-            services.AddOptions<RedisTimerStoreOptions>()
-                .Validate( options => !string.IsNullOrEmpty( options.KeyPrefix ), "KeyPrefix must be provided." )
-                .ValidateOnStart()
-                .Configure( configure );
+            optionsBuilder.Configure( configure );
         }
 
         services.AddSingleton<IDistributedTimerStore, RedisTimerStore>();

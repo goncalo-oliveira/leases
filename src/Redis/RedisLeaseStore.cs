@@ -8,45 +8,49 @@ internal sealed class RedisLeaseStore( IConnectionMultiplexer redisConnection, I
     private readonly IDatabase redis = redisConnection.GetDatabase();
     private readonly RedisLeaseStoreOptions options = optionsAccessor.Value;
 
-    public async Task<bool> TryAcquireAsync( string key, string owner, TimeSpan ttl, CancellationToken cancellationToken )
+    public async Task<IDistributedLeaseHandle?> TryAcquireAsync( string name, string owner, TimeSpan ttl, CancellationToken cancellationToken )
     {
-        return await redis.StringSetAsync(
-            GetRedisKey( key ),
+        var acquired = await redis.StringSetAsync(
+            GetRedisKey( name ),
             owner,
             ttl,
             when: When.NotExists
         )
         .ConfigureAwait( false );
+
+        return acquired
+            ? new RedisLeaseHandle( name, owner, ttl )
+            : null;
     }
 
-    public async Task<bool> RenewAsync( string key, string owner, TimeSpan ttl, CancellationToken cancellationToken )
+    public async Task<bool> RenewAsync( IDistributedLeaseHandle leaseHandle, CancellationToken cancellationToken )
     {
         var result = (int)await redis.ScriptEvaluateAsync(
             LuaScripts.RenewScript,
-            keys: [GetRedisKey( key )],
+            keys: [GetRedisKey( leaseHandle.Name )],
             values:
             [
-                owner,
-                (long)ttl.TotalMilliseconds
+                leaseHandle.OwnerId,
+                (long)leaseHandle.Ttl.TotalMilliseconds
             ] )
             .ConfigureAwait( false );
 
         return result == 1;
     }
 
-    public async Task<bool> ReleaseAsync( string key, string owner, CancellationToken cancellationToken )
+    public async Task<bool> ReleaseAsync( IDistributedLeaseHandle leaseHandle, CancellationToken cancellationToken )
     {
         var result = (int)await redis.ScriptEvaluateAsync(
             LuaScripts.ReleaseScript,
-            keys: [GetRedisKey( key ),],
-            values: [owner]
+            keys: [GetRedisKey( leaseHandle.Name ),],
+            values: [leaseHandle.OwnerId]
         )
         .ConfigureAwait( false );
 
         return result == 1;
     }
 
-    private RedisKey GetRedisKey( string key ) => $"{options.KeyPrefix}:{key}";
+    private RedisKey GetRedisKey( string leaseName ) => $"{options.KeyPrefix}:{leaseName}";
 
     private static class LuaScripts
     {
