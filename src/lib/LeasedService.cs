@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 namespace Faactory.Leases;
 
 /// <summary>
-/// Represents a long-running leased service that uses a distributed lease to ensure that only one instance of the service is active at a time.
+/// Convenience base class for services that use distributed leases to coordinate execution across instances.
 /// </summary>
 /// <param name="leaseStore">The lease store used to acquire, renew, and release leases.</param>
 public abstract class LeasedService( IDistributedLeaseStore leaseStore ) : BackgroundService
