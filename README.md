@@ -35,6 +35,13 @@ Used for:
 - coordinated execution across instances
 - restart-safe scheduling without cron
 
+Behavior:
+
+- first run executes immediately
+- subsequent runs occur every period
+- timer state survives restarts while the backend persists the timer key
+- all instances align on the same schedule
+
 ---
 
 ## Registration
@@ -70,6 +77,8 @@ services.AddRedisDistributedTimers( options =>
     options.KeyPrefix = "timers";
 } );
 ```
+
+---
 
 ### NATS
 
@@ -108,34 +117,40 @@ services.AddNatsDistributedTimers( options =>
 
 ## Usage
 
-### Lease example
+### Acquiring a lease
 
 ```csharp
 public sealed class MyService( IDistributedLeaseStore leaseStore )
-    : LeasedService( leaseStore )
 {
-    protected override async Task ExecuteAsync( CancellationToken stoppingToken )
+    public async Task ExecuteAsync( CancellationToken cancellationToken )
     {
-        while ( !stoppingToken.IsCancellationRequested )
+        var leaseHandle = await leaseStore.TryAcquireAsync(
+            "my-lease",
+            Guid.NewGuid().ToString(),
+            TimeSpan.FromSeconds( 30 ),
+            cancellationToken
+        );
+
+        if ( leaseHandle is null )
         {
-            // do optional non-leader work here
-
-            await using var lease = await TryAcquireLeaseAsync( stoppingToken );
-
-            if ( lease is null )
-            {
-                continue;
-            }
-
-            // leader-only work
+            // failed to acquire lease
+            return;
         }
+
+        await using var lease = new DistributedLease(
+            leaseStore,
+            leaseHandle,
+            TimeSpan.FromSeconds( 10 )
+        );
+
+        // do work while lease is held
     }
 }
 ```
 
 ---
 
-### Timer example
+### Periodic execution
 
 ```csharp
 public sealed class MyService( IDistributedTimerStore timerStore )
@@ -158,13 +173,15 @@ public sealed class MyService( IDistributedTimerStore timerStore )
 
 ---
 
-### Combined example
+### Combining leases and timers
 
 ```csharp
-public sealed class MyService( IDistributedLeaseStore leaseStore, IDistributedTimerStore timerStore )
-    : LeasedService( leaseStore )
+public sealed class MyService(
+    IDistributedLeaseStore leaseStore,
+    IDistributedTimerStore timerStore
+)
 {
-    protected override async Task ExecuteAsync( CancellationToken stoppingToken )
+    public async Task ExecuteAsync( CancellationToken cancellationToken )
     {
         var timer = new DistributedTimer(
             timerStore,
@@ -172,14 +189,27 @@ public sealed class MyService( IDistributedLeaseStore leaseStore, IDistributedTi
             TimeSpan.FromMinutes( 10 )
         );
 
-        while ( await timer.WaitForNextTickAsync( stoppingToken ) )
+        while ( await timer.WaitForNextTickAsync( cancellationToken ) )
         {
-            await using var lease = await TryAcquireLeaseAsync( stoppingToken );
+            // non-leader work can be done here (if any)
 
-            if ( lease is null )
+            var leaseHandle = await leaseStore.TryAcquireAsync(
+                "my-lease",
+                Guid.NewGuid().ToString(),
+                TimeSpan.FromSeconds( 30 ),
+                cancellationToken
+            );
+
+            if ( leaseHandle is null )
             {
                 continue;
             }
+
+            await using var lease = new DistributedLease(
+                leaseStore,
+                leaseHandle,
+                TimeSpan.FromSeconds( 10 )
+            );
 
             // leader-only periodic work
         }
@@ -187,31 +217,61 @@ public sealed class MyService( IDistributedLeaseStore leaseStore, IDistributedTi
 }
 ```
 
---
+---
 
-### Using leases without LeasedService
+## Convenience APIs
+
+The library also provides optional convenience base classes for hosted services.
+
+### LeasedService
+
+Convenience base class for leased services with opiniated defaults.
 
 ```csharp
 public sealed class MyService( IDistributedLeaseStore leaseStore )
+    : LeasedService( leaseStore )
 {
-    public async Task ExecuteAsync( CancellationToken stoppingToken )
+    protected override async Task ExecuteAsync( CancellationToken stoppingToken )
     {
-        var leaseHandle = await leaseStore.TryAcquireAsync(
-            "my-lease",
-            Guid.NewGuid().ToString(), // unique owner ID
-            TimeSpan.FromSeconds( 30 ),
-            stoppingToken
-        );
-
-        if ( leaseHandle is null )
+        while ( !stoppingToken.IsCancellationRequested )
         {
-            // failed to acquire lease
-            return;
+            // non-leader work can be done here (if any)
+
+            await using var lease = await TryAcquireLeaseAsync( stoppingToken );
+
+            if ( lease is null )
+            {
+                continue;
+            }
+
+            // leader-only work
         }
+    }
+}
+```
 
-        await using var lease = new DistributedLease( leaseStore, leaseHandle, TimeSpan.FromSeconds( 10 ) );
+---
 
-        // do work while lease is held
+### PeriodicLeasedService
+
+Convenience base class for periodic leased services with opiniated defaults.
+
+```csharp
+public sealed class MyService(
+    ILoggerFactory loggerFactory,
+    IDistributedLeaseStore leaseStore,
+    IDistributedTimerStore timerStore
+)
+    : PeriodicLeasedService( loggerFactory, leaseStore, timerStore )
+{
+    protected override TimeSpan ExecutionInterval
+        => TimeSpan.FromMinutes( 10 );
+
+    protected override Task RunAsync( CancellationToken cancellationToken )
+    {
+        // leader-only periodic work
+
+        return Task.CompletedTask;
     }
 }
 ```
@@ -232,12 +292,7 @@ public sealed class MyService( IDistributedLeaseStore leaseStore )
 - Lua script creates the timer if missing
 - key expiration drives the next tick
 
-Behavior:
-
-- first run executes immediately
-- subsequent runs occur every period
-- timer state survives restarts while Redis persists the key
-- all instances align on the same schedule
+---
 
 ## NATS Implementation
 
