@@ -1,62 +1,56 @@
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Faactory.Leases;
 
 /// <summary>
 /// Convenience base class for services that use distributed leases to coordinate execution across instances.
 /// </summary>
+/// <param name="loggerFactory">The logger factory instance.</param>
 /// <param name="leaseStore">The lease store used to acquire, renew, and release leases.</param>
-public abstract class LeasedService( IDistributedLeaseStore leaseStore ) : BackgroundService
+public abstract class LeasedService( ILoggerFactory loggerFactory, IDistributedLeaseStore leaseStore )
+    : LeaseAwareService( leaseStore )
 {
-    /// <summary>
-    /// A unique identifier for the service instance, used for lease ownership.
-    /// By default, it generates a new GUID in "n" format (32 digits) using version 7.
-    /// You can override this property to provide a custom identifier if needed.
-    /// </summary>
-    protected virtual string OwnerId { get; } = Guid.CreateVersion7().ToString( "n" );
+    private readonly ILogger logger = loggerFactory.CreateLogger<LeasedService>();
 
     /// <summary>
-    /// The name of the lease, which is used to identify the lease in the lease store.
-    /// By default, it uses the full name of the service class, but you can override this property to provide a custom lease name if needed.
+    /// Executes the logic for acquiring the lease and running the service.
+    /// This method is called by the background service infrastructure and should not be overridden by derived classes.
+    /// Instead, derived classes should implement the ExecuteLeaderAsync method to define the actual work to be performed while holding the lease.
     /// </summary>
-    protected virtual string LeaseName => GetType().FullName ?? GetType().Name;
+    /// <param name="stoppingToken">A token to monitor for cancellation requests.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    protected sealed override async Task ExecuteAsync( CancellationToken stoppingToken )
+    {
+        while ( !stoppingToken.IsCancellationRequested )
+        {
+            try
+            {
+                await using var lease = await TryAcquireLeaseAsync( stoppingToken );
+
+                if ( lease is null )
+                {
+                    continue;
+                }
+
+                await ExecuteLeaderAsync( lease.CancellationToken );
+            }
+            catch ( OperationCanceledException ) when ( stoppingToken.IsCancellationRequested )
+            {
+                // shutdown requested, exit loop
+                break;
+            }
+            catch ( Exception ex )
+            {
+                logger.LogError( ex, "Failed to execute leased service for {LeaseName}.", LeaseName );
+            }
+        }
+    }
 
     /// <summary>
-    /// The time-to-live (TTL) for the lease, which determines how long the lease is valid before it expires.
-    /// </summary>
-    protected virtual TimeSpan LeaseTtl => TimeSpan.FromSeconds( 30 );
-
-    /// <summary>
-    /// The interval at which the service should attempt to renew the lease before it expires.
-    /// </summary>
-    protected virtual TimeSpan RenewalInterval => TimeSpan.FromSeconds( 10 );
-
-    /// <summary>
-    /// The interval at which the service should retry acquiring the lease if it fails to acquire it initially.
-    /// </summary>
-    protected virtual TimeSpan RetryInterval => RenewalInterval;
-
-    /// <summary>
-    /// Attempts to acquire the lease for the service.
+    /// Executes the logic for the service when it holds the lease.
+    /// This method is called by the instance that successfully acquires the lease.
     /// </summary>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-    /// <returns>A DistributedLease object if the lease is successfully acquired; otherwise, null.</returns>
-    protected async Task<DistributedLease?> TryAcquireLeaseAsync( CancellationToken cancellationToken )
-    {
-        var handle = await leaseStore.TryAcquireAsync(
-            LeaseName,
-            OwnerId,
-            LeaseTtl,
-            cancellationToken
-        );
-
-        if ( handle is null )
-        {
-            await JitterDelay.DelayAsync( RetryInterval, cancellationToken );
-
-            return null;
-        }
-
-        return new DistributedLease( leaseStore, handle, RenewalInterval );
-    }
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    protected abstract Task ExecuteLeaderAsync( CancellationToken cancellationToken );
 }

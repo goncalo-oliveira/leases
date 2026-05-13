@@ -14,7 +14,7 @@ public class LeaseTests
     }
 
     internal sealed class TestService( IDistributedLeaseStore store )
-        : LeasedService(store)
+        : LeaseAwareService(store)
     {
         protected override string LeaseName => "test";
         protected override TimeSpan LeaseTtl => TimeSpan.FromMilliseconds( 200 );

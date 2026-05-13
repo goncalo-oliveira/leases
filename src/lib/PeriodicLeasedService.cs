@@ -10,7 +10,7 @@ namespace Faactory.Leases;
 /// <param name="leaseStore">The lease store used to acquire, renew, and release leases.</param>
 /// <param name="timerStore">The timer store used to manage timers for periodic execution.</param>
 public abstract class PeriodicLeasedService( ILoggerFactory loggerFactory, IDistributedLeaseStore leaseStore, IDistributedTimerStore timerStore )
-    : LeasedService( leaseStore )
+    : LeaseAwareService( leaseStore )
 {
     private readonly ILogger logger = loggerFactory.CreateLogger<PeriodicLeasedService>();
 
@@ -27,7 +27,7 @@ public abstract class PeriodicLeasedService( ILoggerFactory loggerFactory, IDist
     /// </summary>
     /// <param name="stoppingToken">A token to monitor for cancellation requests.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    protected override async Task ExecuteAsync( CancellationToken stoppingToken )
+    protected sealed override async Task ExecuteAsync( CancellationToken stoppingToken )
     {
         var timer = new DistributedTimer(
             timerStore,
@@ -47,7 +47,7 @@ public abstract class PeriodicLeasedService( ILoggerFactory loggerFactory, IDist
                     continue;
                 }
 
-                await RunAsync( stoppingToken );
+                await RunAsync( lease.CancellationToken );
             }
             catch ( OperationCanceledException ) when ( stoppingToken.IsCancellationRequested )
             {

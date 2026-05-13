@@ -225,27 +225,15 @@ The library also provides optional convenience base classes for hosted services.
 
 ### LeasedService
 
-Convenience base class for leased services with opiniated defaults.
+Convenience base class for leased services with opiniated defaults. Handles lease acquisition and renewal, allowing you to focus on the leader-only work.
 
 ```csharp
-public sealed class MyService( IDistributedLeaseStore leaseStore )
-    : LeasedService( leaseStore )
+public sealed class MyService( ILoggerFactory loggerFactory, IDistributedLeaseStore leaseStore )
+    : LeasedService( loggerFactory, leaseStore )
 {
-    protected override async Task ExecuteAsync( CancellationToken stoppingToken )
+    protected override async Task ExecuteLeaderAsync( CancellationToken cancellationToken )
     {
-        while ( !stoppingToken.IsCancellationRequested )
-        {
-            // non-leader work can be done here (if any)
-
-            await using var lease = await TryAcquireLeaseAsync( stoppingToken );
-
-            if ( lease is null )
-            {
-                continue;
-            }
-
-            // leader-only work
-        }
+        // leader-only work
     }
 }
 ```
@@ -254,7 +242,7 @@ public sealed class MyService( IDistributedLeaseStore leaseStore )
 
 ### PeriodicLeasedService
 
-Convenience base class for periodic leased services with opiniated defaults.
+Convenience base class for periodic leased services with opiniated defaults. Handles lease acquisition, renewal, and periodic execution, allowing you to focus on the leader-only work.
 
 ```csharp
 public sealed class MyService(
