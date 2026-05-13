@@ -35,7 +35,7 @@ internal sealed class RedisTimerStore( IConnectionMultiplexer redisConnection, I
 
         if ttl <= 0 then
             redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
-            return 0
+            return ARGV[2]
         end
 
         return ttl

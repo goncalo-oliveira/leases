@@ -31,22 +31,29 @@ internal sealed class NatsTimerStore( NatsClient nats, IOptions<NatsTimerStoreOp
             return period;
         }
 
-        var entry = await store.GetEntryAsync<long>(
-            natsKey,
-            cancellationToken: cancellationToken
-        )
-        .ConfigureAwait( false );
+        try
+        {
+            var entry = await store.GetEntryAsync<long>(
+                natsKey,
+                cancellationToken: cancellationToken
+            )
+            .ConfigureAwait( false );
 
-        if ( entry.Error is not null || entry.Value <= 0 )
+            if ( entry.Error is not null || entry.Value <= 0 )
+            {
+                return TimeSpan.Zero;
+            }
+
+            var remaining =  entry.Created + period - DateTimeOffset.UtcNow;
+
+            return remaining > TimeSpan.Zero
+                ? remaining
+                : TimeSpan.Zero;
+        }
+        catch ( NatsKVKeyNotFoundException )
         {
             return TimeSpan.Zero;
         }
-
-        var remaining =  entry.Created + period - DateTimeOffset.UtcNow;
-
-        return remaining > TimeSpan.Zero
-            ? remaining
-            : TimeSpan.Zero;
     }
 
     private string GetNatsKey( string key ) => $"{options.KeyPrefix}.{key}";
@@ -72,6 +79,7 @@ internal sealed class NatsTimerStore( NatsClient nats, IOptions<NatsTimerStoreOp
                 new NatsKVConfig( options.BucketName )
                 {
                     History = 1,
+                    LimitMarkerTTL = options.BucketMarkerTtl
                 },
                 cancellationToken
             ).ConfigureAwait( false );

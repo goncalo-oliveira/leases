@@ -32,7 +32,12 @@ public abstract class LeasedService( ILoggerFactory loggerFactory, IDistributedL
                     continue;
                 }
 
-                await ExecuteLeaderAsync( lease.CancellationToken );
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+                    stoppingToken,
+                    lease.CancellationToken
+                );
+
+                await ExecuteLeaderAsync( cts.Token );
             }
             catch ( OperationCanceledException ) when ( stoppingToken.IsCancellationRequested )
             {

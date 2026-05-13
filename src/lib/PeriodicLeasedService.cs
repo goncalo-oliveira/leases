@@ -47,7 +47,12 @@ public abstract class PeriodicLeasedService( ILoggerFactory loggerFactory, IDist
                     continue;
                 }
 
-                await RunAsync( lease.CancellationToken );
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+                    stoppingToken,
+                    lease.CancellationToken
+                );
+
+                await RunAsync( cts.Token );
             }
             catch ( OperationCanceledException ) when ( stoppingToken.IsCancellationRequested )
             {

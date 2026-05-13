@@ -37,8 +37,8 @@ Used for:
 
 Behavior:
 
-- first run executes immediately
-- subsequent runs occur every period
+- first execution occurs after the configured period
+- subsequent executions occur at the same interval, aligned to the initial schedule
 - timer state survives restarts while the backend persists the timer key
 - all instances align on the same schedule
 
