@@ -54,7 +54,7 @@ public abstract class PeriodicLeasedService( ILoggerFactory loggerFactory, IDist
 
                 await RunAsync( cts.Token );
             }
-            catch ( OperationCanceledException ) when ( stoppingToken.IsCancellationRequested )
+            catch ( OperationCanceledException )
             {
                 // Graceful shutdown
                 break;

@@ -39,7 +39,7 @@ public abstract class LeasedService( ILoggerFactory loggerFactory, IDistributedL
 
                 await ExecuteLeaderAsync( cts.Token );
             }
-            catch ( OperationCanceledException ) when ( stoppingToken.IsCancellationRequested )
+            catch ( OperationCanceledException )
             {
                 // shutdown requested, exit loop
                 break;
