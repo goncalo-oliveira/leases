@@ -18,7 +18,7 @@ public abstract class PeriodicLeasedService( ILoggerFactory loggerFactory, IDist
     /// Gets the interval at which the periodic task should be executed.
     /// The instance that holds the lease will execute the task at this interval.
     /// </summary>
-    protected abstract TimeSpan ExecutionInterval { get; }
+    protected abstract TimeSpan RunInterval { get; }
 
     /// <summary>
     /// Executes the logic for acquiring the lease and running the periodic task.
@@ -32,7 +32,7 @@ public abstract class PeriodicLeasedService( ILoggerFactory loggerFactory, IDist
         var timer = new DistributedTimer(
             timerStore,
             $"{LeaseName}.timer",
-            ExecutionInterval,
+            RunInterval,
             loggerFactory
         );
 
