@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <AssemblyName>faactory.leases.nats</AssemblyName>
     <RootNamespace>Faactory.Leases.NATS</RootNamespace>
     <PackageId>Faactory.Leases.NATS</PackageId>
